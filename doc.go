@@ -1,5 +1,5 @@
 /*
-Connpool is a general purpose connection pool.
+connpool is a general purpose connection pool.
 
 Below is a demo showing how to use it.
 

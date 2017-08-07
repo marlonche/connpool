@@ -106,10 +106,15 @@ func (self *itemInfo) SetContainer(container PoolItem) {
 }
 
 // Create a connection pool.
+//
 // name is an unique id of this pool,
+//
 // creator is the Creator interface implemented by user,
+//
 // maxItemNum is the maximum number of active and idle connections hold by this pool,
+//
 // maxIdleNum is the maximum number of idle connections hold by this pool,
+//
 // idleTimeout is the timeout of idle connections in second.
 func NewPool(name string, creator Creator, maxItemNum int, maxIdleNum int, idleTimeout int) *Pool {
 	fmt.Printf("NewPool, name:%v, maxItemNum:%v, maxIdleNum:%v, idleTimeout:%v", name, maxItemNum, maxIdleNum, idleTimeout)
