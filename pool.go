@@ -121,7 +121,7 @@ func (self *itemInfo) SetContainer(container PoolItem) {
 // idleTimeout is the timeout in second of idle connections, 0 means no timeout.
 // If an item is in idle state for at least idleTimeout seconds, the item will be removed from pool.
 func NewPool(name string, creator Creator, maxItemNum int, maxIdleNum int, idleTimeout int) *Pool {
-	fmt.Printf("NewPool, name:%v, maxItemNum:%v, maxIdleNum:%v, idleTimeout:%v", name, maxItemNum, maxIdleNum, idleTimeout)
+	fmt.Printf("NewPool, name:%v, maxItemNum:%v, maxIdleNum:%v, idleTimeout:%v\n", name, maxItemNum, maxIdleNum, idleTimeout)
 	if maxIdleNum == maxItemNum {
 		maxIdleNum = maxItemNum + 1 //manage to be reused
 	}
@@ -139,20 +139,19 @@ func NewPool(name string, creator Creator, maxItemNum int, maxIdleNum int, idleT
 	}
 	go pool.newItem()
 	go pool.checkMore()
-	fmt.Printf("NewPool:%v", pool.name)
 	return pool
 }
 
 func (self *Pool) newItem() {
 	defer func() {
 		if e := recover(); e != nil {
-			fmt.Printf("panic:%v, chanTotal closed?", e)
+			fmt.Printf("panic:%v, chanTotal closed?\n", e)
 		}
 	}()
 	for {
 		select {
 		case <-self.chanClose:
-			fmt.Printf("chanToNew closed")
+			fmt.Printf("chanToNew closed\n")
 			return
 		case <-self.chanToNew:
 		}
@@ -160,7 +159,7 @@ func (self *Pool) newItem() {
 		go func() {
 			defer func() {
 				if e := recover(); e != nil {
-					fmt.Printf("panic:%v, chanIdle closed?", e)
+					fmt.Printf("panic:%v, chanIdle closed?\n", e)
 				}
 			}()
 			item, err := self.creator.NewItem()
@@ -173,13 +172,13 @@ func (self *Pool) newItem() {
 					case self.chanToNew <- struct{}{}:
 					}
 				}
-				fmt.Printf("creator NewItem, self:%v, error:%v", self.name, err)
+				fmt.Printf("creator NewItem, self:%v, error:%v\n", self.name, err)
 				return
 			}
 			itemInfo := newInfoItem(item)
 			item.SetContainer(itemInfo)
 			self.chanIdle <- itemInfo
-			fmt.Printf("newItem item:%p, self:%v, chanTotal:%v, chanToNew:%v, chanIdle:%v", itemInfo, self.name, len(self.chanTotal), len(self.chanToNew), len(self.chanIdle))
+			fmt.Printf("newItem item:%p, self:%v, chanTotal:%v, chanToNew:%v, chanIdle:%v\n", itemInfo, self.name, len(self.chanTotal), len(self.chanToNew), len(self.chanIdle))
 		}()
 	}
 }
@@ -187,7 +186,7 @@ func (self *Pool) newItem() {
 func (self *Pool) checkMore() {
 	defer func() {
 		if e := recover(); e != nil {
-			fmt.Printf("pool:%v closed, panic:%v", self.name, e)
+			fmt.Printf("pool:%v closed, panic:%v\n", self.name, e)
 		}
 	}()
 	for {
@@ -213,7 +212,7 @@ func (self *Pool) SetGetTimeout(timeout int) {
 func (self *Pool) Get() (_item PoolItem, _err error) {
 	defer func() {
 		if e := recover(); e != nil {
-			fmt.Printf("pool closed, panic:%v", e)
+			fmt.Printf("pool closed, panic:%v\n", e)
 			_item = nil
 			_err = errPoolClosed
 		}
@@ -244,7 +243,7 @@ func (self *Pool) Get() (_item PoolItem, _err error) {
 				continue
 			}
 			if err := self.creator.InitItem(item.item, item.useCount); err != nil {
-				fmt.Printf("InitItem error, item:%v, self:%v, err:%v", item, self.name, err)
+				fmt.Printf("InitItem error, item:%v, self:%v, err:%v\n", item, self.name, err)
 				self.closeItem(item, err)
 				return nil, err
 			}
@@ -281,7 +280,7 @@ func (self *Pool) Get() (_item PoolItem, _err error) {
 				continue
 			}
 			if err := self.creator.InitItem(item.item, item.useCount); err != nil {
-				fmt.Printf("InitItem error, item:%v, self:%v, err:%v", item, self.name, err)
+				fmt.Printf("InitItem error, item:%v, self:%v, err:%v\n", item, self.name, err)
 				self.closeItem(item, err)
 				return nil, err
 			}
@@ -320,7 +319,7 @@ func (self *Pool) ClearItem(item PoolItem) {
 func (self *Pool) doClearItem(_item PoolItem) {
 	defer func() {
 		if e := recover(); e != nil {
-			fmt.Printf("panic:%v", e)
+			fmt.Printf("panic:%v\n", e)
 		}
 	}()
 	container := _item.GetContainer()
@@ -361,13 +360,13 @@ var unitCount uint64 = 0
 func (self *Pool) doGiveBack(_item PoolItem) {
 	defer func() {
 		if e := recover(); e != nil {
-			fmt.Printf("panic:%v", e)
+			fmt.Printf("panic:%v\n", e)
 		}
 	}()
 	container := _item.GetContainer()
 	item, ok := container.(*itemInfo)
 	if !ok || nil == item {
-		fmt.Printf("invalid poolItem, self:%v", self.name)
+		fmt.Printf("invalid poolItem, self:%v\n", self.name)
 		return
 	}
 	if item.closed {
@@ -385,13 +384,13 @@ func (self *Pool) doGiveBack(_item PoolItem) {
 	if unit >= 200 {
 		unit = 0
 		unitCount++
-		fmt.Printf("doGiveBack unitCount:%v, self:%v", unitCount, self.name)
+		fmt.Printf("doGiveBack unitCount:%v, self:%v\n", unitCount, self.name)
 	}
 }
 
 // Close the pool.
 func (self *Pool) Close() {
-	fmt.Printf("Close Pool:%v", self.name)
+	fmt.Printf("Close Pool:%v\n", self.name)
 	select {
 	case <-self.chanClose:
 		return
