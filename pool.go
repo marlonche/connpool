@@ -132,8 +132,8 @@ func NewPool(name string, creator Creator, maxItemNum int, maxIdleNum int, idleT
 		idleTimeout:   idleTimeout,
 		creator:       creator,
 		chanIdle:      make(chan *itemInfo, maxIdleNum),
-		chanToNew:     make(chan struct{}, maxIdleNum),
-		chanCheckMore: make(chan struct{}, maxIdleNum),
+		chanToNew:     make(chan struct{}, 1),
+		chanCheckMore: make(chan struct{}, 1),
 		chanTotal:     make(chan struct{}, maxItemNum),
 		chanClose:     make(chan struct{}, 1),
 	}
@@ -155,7 +155,15 @@ func (self *Pool) newItem() {
 			return
 		case <-self.chanToNew:
 		}
-		self.chanTotal <- struct{}{}
+		select {
+		case itemTemp, ok := <-self.chanIdle:
+			if !ok {
+				return
+			}
+			self.chanIdle <- itemTemp
+			continue
+		case self.chanTotal <- struct{}{}:
+		}
 		go func() {
 			defer func() {
 				if e := recover(); e != nil {
@@ -332,6 +340,7 @@ func (self *Pool) doClearItem(_item PoolItem) {
 		err := item.item.GetErr()
 		item.item.SetContainer(nil)
 		if err != errPoolClosed && err != errIdleFull {
+			fmt.Printf("clearItem error to new:%v\n", err)
 			select {
 			case self.chanToNew <- struct{}{}:
 			default:
@@ -376,7 +385,7 @@ func (self *Pool) doGiveBack(_item PoolItem) {
 	item.idleTime = time.Now().Unix()
 	select {
 	case self.chanIdle <- item: //may send on closed channel
-	default:
+	case <-time.After(time.Duration(self.idleTimeout) * time.Second):
 		self.closeItem(item, errIdleFull)
 		return
 	}

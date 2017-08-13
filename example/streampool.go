@@ -6,6 +6,7 @@ import (
 	"github.com/marlonche/connpool"
 	"net"
 	"sync"
+	"time"
 )
 
 type PooledStreamErr string
@@ -81,6 +82,7 @@ func (self *PooledStream) Close() error {
 	}
 	err := self.err
 	if err != nil {
+		fmt.Printf("PooledStream Close, self:%p, err:%v\n", self, err)
 		self.pool.clearConn(self)
 		self.pool = nil
 		self.closed = true
@@ -113,6 +115,7 @@ func (self *streamCreator) NewItem() (connpool.PoolItem, error) {
 		return nil, err
 	}
 	pooledStream := NewPooledStream(conn, self.pool)
+	fmt.Printf("NewPooledStream:%p\n", pooledStream)
 	return pooledStream, nil
 }
 
@@ -128,11 +131,12 @@ func (self *streamCreator) InitItem(item connpool.PoolItem, n uint64) error {
 				for {
 					s, err := r.ReadString('\n')
 					if err != nil {
+						fmt.Printf("ReadString error:%v\n", err)
 						stream.SetErr(err)
 						stream.Close()
 						break
 					}
-					fmt.Printf("get echo from server: %v", s)
+					fmt.Printf("%v, get echo from server: %v", time.Now(), s)
 				}
 			}()
 		}

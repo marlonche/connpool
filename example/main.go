@@ -6,11 +6,17 @@ import (
 	"fmt"
 
 	"net"
+	"net/http"
+	_ "net/http/pprof"
 	"time"
 )
 
 var flagAsServer = flag.Bool("asServer", false, "run as server demo")
 var flagAddrServer = flag.String("addr", "", "server address")
+var flagGetCount = flag.Int("getCount", 5000, "loop count")
+var flagMaxItemNum = flag.Int("maxItemNum", 10, "maximum number of active and idle items")
+var flagMaxIdleNum = flag.Int("maxIdleNum", 5, "maximum number of idle items")
+var flagIdleTimeout = flag.Int("idleTimeout", 60, "idle timeout in second")
 
 func main() {
 	flag.Parse()
@@ -24,11 +30,15 @@ func main() {
 }
 
 func runAsClient(addr string) {
+	go func() {
+		fmt.Println(http.ListenAndServe(":6060", nil))
+	}()
+
 	if len(addr) == 0 {
 		addr = "127.0.0.1:9999"
 	}
-	pool := NewStreamPool("pool-name", addr, 10, 5, 60)
-	for i := 0; i < 5000; i++ {
+	pool := NewStreamPool("pool-name", addr, *flagMaxItemNum, *flagMaxIdleNum, *flagIdleTimeout)
+	for i := 0; i < *flagGetCount; i++ {
 		go func() {
 			conn, err := pool.Get()
 			if err != nil {
@@ -48,6 +58,10 @@ func runAsClient(addr string) {
 }
 
 func runAsServer(addr string) {
+	go func() {
+		fmt.Println(http.ListenAndServe(":6061", nil))
+	}()
+
 	if len(addr) == 0 {
 		addr = ":9999"
 	}
@@ -56,12 +70,14 @@ func runAsServer(addr string) {
 		fmt.Printf("listen error: %v\n", err)
 		return
 	}
+	fmt.Printf("listen address:%v\n", l.Addr())
 	for {
 		conn, err := l.Accept()
 		if err != nil {
 			fmt.Printf("Accept error: %v\n", err)
 			return
 		}
+		fmt.Printf("accept conn:%v\n", conn.RemoteAddr())
 		go func() {
 			r := bufio.NewReader(conn)
 			for {
