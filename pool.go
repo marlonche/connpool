@@ -418,7 +418,7 @@ func (self *Pool) doGiveBack(_item PoolItem) {
 	item.idleTime = time.Now().Unix()
 	select {
 	case self.chanIdle <- item: //may send on closed channel
-	case <-time.After(time.Duration(self.idleTimeout) * time.Second):
+	case <-time.After(time.Duration(10) * time.Second):
 		self.closeItem(item, errIdleFull)
 		return
 	}
