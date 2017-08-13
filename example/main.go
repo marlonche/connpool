@@ -13,7 +13,9 @@ import (
 
 var flagAsServer = flag.Bool("asServer", false, "run as server demo")
 var flagAddrServer = flag.String("addr", "", "server address")
-var flagGetCount = flag.Int("getCount", 5000, "loop count")
+var flagGetCount = flag.Int("getCount", 5000, "get count")
+var flagLoopCount = flag.Int("loopCount", 4, "loop count")
+var flagLoopInterval = flag.Int("loopInterval", 15, "loop interval")
 var flagMaxItemNum = flag.Int("maxItemNum", 10, "maximum number of active and idle items")
 var flagMaxIdleNum = flag.Int("maxIdleNum", 5, "maximum number of idle items")
 var flagIdleTimeout = flag.Int("idleTimeout", 60, "idle timeout in second")
@@ -22,6 +24,14 @@ func main() {
 	flag.Parse()
 	asServer := *flagAsServer
 	addr := *flagAddrServer
+	pprofAddr := ":6060"
+	if asServer {
+		pprofAddr = ":6061"
+	}
+	go func() {
+		fmt.Println(http.ListenAndServe(pprofAddr, nil))
+	}()
+
 	if asServer {
 		runAsServer(addr)
 	} else {
@@ -30,38 +40,33 @@ func main() {
 }
 
 func runAsClient(addr string) {
-	go func() {
-		fmt.Println(http.ListenAndServe(":6060", nil))
-	}()
-
 	if len(addr) == 0 {
 		addr = "127.0.0.1:9999"
 	}
 	pool := NewStreamPool("pool-name", addr, *flagMaxItemNum, *flagMaxIdleNum, *flagIdleTimeout)
-	for i := 0; i < *flagGetCount; i++ {
-		go func() {
-			conn, err := pool.Get()
-			if err != nil {
-				fmt.Printf("pool.Get() error: %v\n", err)
-				return
-			}
-			defer conn.Close()
-			content := fmt.Sprintf("Hello, my id is %v\n", time.Now().Nanosecond())
-			_, err = conn.Write([]byte(content))
-			if err != nil {
-				fmt.Printf("conn write error: %v\n", err)
-				conn.SetErr(err)
-			}
-		}()
+	for j := 0; j < *flagLoopCount; j++ {
+		for i := 0; i < *flagGetCount; i++ {
+			go func() {
+				conn, err := pool.Get()
+				if err != nil {
+					fmt.Printf("pool.Get() error: %v\n", err)
+					return
+				}
+				defer conn.Close()
+				content := fmt.Sprintf("Hello, my id is %v\n", time.Now().Nanosecond())
+				_, err = conn.Write([]byte(content))
+				if err != nil {
+					fmt.Printf("conn write error: %v\n", err)
+					conn.SetErr(err)
+				}
+			}()
+		}
+		time.Sleep(time.Second * time.Duration(*flagLoopInterval))
 	}
 	time.Sleep(time.Hour)
 }
 
 func runAsServer(addr string) {
-	go func() {
-		fmt.Println(http.ListenAndServe(":6061", nil))
-	}()
-
 	if len(addr) == 0 {
 		addr = ":9999"
 	}

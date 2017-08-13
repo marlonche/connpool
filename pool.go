@@ -139,6 +139,7 @@ func NewPool(name string, creator Creator, maxItemNum int, maxIdleNum int, idleT
 	}
 	go pool.newItem()
 	go pool.checkMore()
+	go pool.checkIdle()
 	return pool
 }
 
@@ -207,6 +208,38 @@ func (self *Pool) checkMore() {
 			self.chanIdle <- itemTemp
 		default:
 			self.chanToNew <- struct{}{}
+		}
+	}
+}
+func (self *Pool) checkIdle() {
+	if self.idleTimeout <= 0 {
+		return
+	}
+	defer func() {
+		if e := recover(); e != nil {
+			fmt.Printf("pool:%v closed, panic:%v\n", self.name, e)
+		}
+	}()
+	checkInterval := self.idleTimeout
+	if checkInterval > 10 {
+		checkInterval = 10
+	}
+	for {
+		select {
+		case itemTemp, ok := <-self.chanIdle:
+			if !ok {
+				return
+			}
+			if self.checkIdleTimeout(itemTemp) {
+				continue
+			}
+			select {
+			case self.chanIdle <- itemTemp:
+			case <-time.After(time.Duration(self.idleTimeout) * time.Second):
+				self.closeItem(itemTemp, errIdleTimeout)
+				continue
+			}
+			time.Sleep(time.Duration(checkInterval) * time.Second)
 		}
 	}
 }
@@ -305,7 +338,7 @@ func (self *Pool) checkIdleTimeout(item *itemInfo) bool {
 		return false
 	}
 	markTime := time.Now().Unix() - int64(self.idleTimeout)
-	if item.idleTime < markTime {
+	if item.idleTime <= markTime {
 		self.closeItem(item, errIdleTimeout)
 		return true
 	}
@@ -339,7 +372,7 @@ func (self *Pool) doClearItem(_item PoolItem) {
 		<-self.chanTotal
 		err := item.item.GetErr()
 		item.item.SetContainer(nil)
-		if err != errPoolClosed && err != errIdleFull {
+		if err != errPoolClosed && err != errIdleFull && err != errIdleTimeout {
 			fmt.Printf("clearItem error to new:%v\n", err)
 			select {
 			case self.chanToNew <- struct{}{}:
