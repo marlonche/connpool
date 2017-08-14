@@ -231,7 +231,8 @@ func (self *Pool) SetGetTimeout(timeout int) {
 	self.getTimeout = timeout
 }
 
-// Get pooled item created by Creator.NewItem().
+// Get pooled item originally created by Creator.NewItem().
+//
 // If SetGetTimeout() is called with non-zero value, Get() will return with
 // error ErrGetTimeout after timeout.
 func (self *Pool) Get() (_item PoolItem, _err error) {
@@ -445,12 +446,12 @@ func (self *Pool) Closed() bool {
 	}
 }
 
-// Get total items number, active and idle.
+// Get the total number of all items including active and idle.
 func (self *Pool) GetTotalNum() int {
 	return len(self.chanTotal)
 }
 
-// Get idle items number.
+// Get the number of idle items.
 func (self *Pool) GetIdleNum() int {
 	return len(self.chanIdle)
 }
