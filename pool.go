@@ -62,7 +62,7 @@ type Pool struct {
 	chanIdle    chan *itemInfo
 	chanToNew   chan struct{}
 	chanTotal   chan struct{}
-	maxItemNum  int
+	maxTotalNum int
 	maxIdleNum  int
 	idleTimeout int
 	getTimeout  int
@@ -114,7 +114,7 @@ func (self *itemInfo) SetContainer(container PoolItem) {
 //
 // creator is the Creator interface implemented by user;
 //
-// maxItemNum is the maximum number of active and idle connections hold by this pool;
+// maxTotalNum is the maximum total number of active and idle connections hold by this pool;
 //
 // Here active refers to an item being hold by a user after Pool.Get(),
 // while idle refers to an item in the pool waiting for Pool.Get().
@@ -123,20 +123,20 @@ func (self *itemInfo) SetContainer(container PoolItem) {
 //
 // idleTimeout is the timeout in second of idle connections, 0 means no timeout.
 // If an item is in idle state for at least idleTimeout seconds, the item will be removed from pool.
-func NewPool(name string, creator Creator, maxItemNum int, maxIdleNum int, idleTimeout int) *Pool {
-	fmt.Printf("NewPool, name:%v, maxItemNum:%v, maxIdleNum:%v, idleTimeout:%v\n", name, maxItemNum, maxIdleNum, idleTimeout)
-	if maxIdleNum == maxItemNum {
-		maxIdleNum = maxItemNum + 1 //manage to be reused
+func NewPool(name string, creator Creator, maxTotalNum int, maxIdleNum int, idleTimeout int) *Pool {
+	fmt.Printf("NewPool, name:%v, maxTotalNum:%v, maxIdleNum:%v, idleTimeout:%v\n", name, maxTotalNum, maxIdleNum, idleTimeout)
+	if maxIdleNum == maxTotalNum {
+		maxIdleNum = maxTotalNum + 1 //manage to be reused
 	}
 	pool := &Pool{
 		name:        name,
-		maxItemNum:  maxItemNum,
+		maxTotalNum: maxTotalNum,
 		maxIdleNum:  maxIdleNum,
 		idleTimeout: idleTimeout,
 		creator:     creator,
 		chanIdle:    make(chan *itemInfo, maxIdleNum),
 		chanToNew:   make(chan struct{}, 1),
-		chanTotal:   make(chan struct{}, maxItemNum),
+		chanTotal:   make(chan struct{}, maxTotalNum),
 		chanClose:   make(chan struct{}, 1),
 	}
 	go pool.newItem()

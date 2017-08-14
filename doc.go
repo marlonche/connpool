@@ -159,12 +159,12 @@ streampool.go
  	pool *connpool.Pool
  }
 
- func NewStreamPool(name string, addr string, maxConn int, maxIdle int, idleTimeout int) *StreamPool {
+ func NewStreamPool(name string, addr string, maxTotal int, maxIdle int, idleTimeout int) *StreamPool {
  	creator := &streamCreator{
  		addr: addr,
  	}
  	streamPool := &StreamPool{
- 		pool: connpool.NewPool(name, creator, maxConn, maxIdle, idleTimeout),
+ 		pool: connpool.NewPool(name, creator, maxTotal, maxIdle, idleTimeout),
  	}
  	creator.pool = streamPool
  	return streamPool

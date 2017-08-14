@@ -16,7 +16,7 @@ var flagAddrServer = flag.String("addr", "", "server address")
 var flagGetCount = flag.Int("getCount", 5000, "get count")
 var flagLoopCount = flag.Int("loopCount", 4, "loop count")
 var flagLoopInterval = flag.Int("loopInterval", 15, "loop interval")
-var flagMaxItemNum = flag.Int("maxItemNum", 10, "maximum number of active and idle items")
+var flagMaxTotalNum = flag.Int("maxTotalNum", 10, "maximum total number of active and idle items")
 var flagMaxIdleNum = flag.Int("maxIdleNum", 5, "maximum number of idle items")
 var flagIdleTimeout = flag.Int("idleTimeout", 60, "idle timeout in second")
 
@@ -43,7 +43,7 @@ func runAsClient(addr string) {
 	if len(addr) == 0 {
 		addr = "127.0.0.1:9999"
 	}
-	pool := NewStreamPool("pool-name", addr, *flagMaxItemNum, *flagMaxIdleNum, *flagIdleTimeout)
+	pool := NewStreamPool("pool-name", addr, *flagMaxTotalNum, *flagMaxIdleNum, *flagIdleTimeout)
 	for j := 0; j < *flagLoopCount; j++ {
 		for i := 0; i < *flagGetCount; i++ {
 			go func() {
