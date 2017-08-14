@@ -339,7 +339,10 @@ func (self *Pool) closeItem(item *itemInfo, err error) {
 	}()
 }
 
-// Call this method to clear items in error state from the pool.
+// Call this method to clear items with error from the pool.
+//
+// This method is called by user in the implementation of PoolItem.Close() when
+// an error previously set by PoolItem.SetErr() is detected.
 func (self *Pool) ClearItem(item PoolItem) {
 	go self.doClearItem(item)
 }
@@ -378,7 +381,10 @@ func (self *Pool) IsItemActive(_item PoolItem) bool {
 	return false
 }
 
-// Call this method to give normal items back to the pool after usage.
+// Call this method to give normal(non-error) items back to the pool after use.
+//
+// This method is called by user in the implementation of PoolItem.Close() when
+// no error with item is detected.
 func (self *Pool) GiveBack(item PoolItem) {
 	go self.doGiveBack(item)
 }
