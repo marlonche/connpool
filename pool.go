@@ -56,17 +56,16 @@ type itemInfo struct {
 
 // The main pool struct.
 type Pool struct {
-	name          string
-	chanIdle      chan *itemInfo
-	chanToNew     chan struct{}
-	chanCheckMore chan struct{}
-	chanTotal     chan struct{}
-	maxItemNum    int
-	maxIdleNum    int
-	idleTimeout   int
-	getTimeout    int
-	creator       Creator
-	chanClose     chan struct{}
+	name        string
+	chanIdle    chan *itemInfo
+	chanToNew   chan struct{}
+	chanTotal   chan struct{}
+	maxItemNum  int
+	maxIdleNum  int
+	idleTimeout int
+	getTimeout  int
+	creator     Creator
+	chanClose   chan struct{}
 }
 
 var errPoolClosed = errors.New("the pool is closed")
@@ -126,19 +125,17 @@ func NewPool(name string, creator Creator, maxItemNum int, maxIdleNum int, idleT
 		maxIdleNum = maxItemNum + 1 //manage to be reused
 	}
 	pool := &Pool{
-		name:          name,
-		maxItemNum:    maxItemNum,
-		maxIdleNum:    maxIdleNum,
-		idleTimeout:   idleTimeout,
-		creator:       creator,
-		chanIdle:      make(chan *itemInfo, maxIdleNum),
-		chanToNew:     make(chan struct{}, 1),
-		chanCheckMore: make(chan struct{}, 1),
-		chanTotal:     make(chan struct{}, maxItemNum),
-		chanClose:     make(chan struct{}, 1),
+		name:        name,
+		maxItemNum:  maxItemNum,
+		maxIdleNum:  maxIdleNum,
+		idleTimeout: idleTimeout,
+		creator:     creator,
+		chanIdle:    make(chan *itemInfo, maxIdleNum),
+		chanToNew:   make(chan struct{}, 1),
+		chanTotal:   make(chan struct{}, maxItemNum),
+		chanClose:   make(chan struct{}, 1),
 	}
 	go pool.newItem()
-	go pool.checkMore()
 	go pool.checkIdle()
 	return pool
 }
@@ -192,25 +189,6 @@ func (self *Pool) newItem() {
 	}
 }
 
-func (self *Pool) checkMore() {
-	defer func() {
-		if e := recover(); e != nil {
-			fmt.Printf("pool:%v closed, panic:%v\n", self.name, e)
-		}
-	}()
-	for {
-		<-self.chanCheckMore
-		select {
-		case itemTemp, ok := <-self.chanIdle:
-			if !ok {
-				return
-			}
-			self.chanIdle <- itemTemp
-		default:
-			self.chanToNew <- struct{}{}
-		}
-	}
-}
 func (self *Pool) checkIdle() {
 	if self.idleTimeout <= 0 {
 		return
@@ -306,7 +284,7 @@ func (self *Pool) Get() (_item PoolItem, _err error) {
 			}
 		}
 		select {
-		case self.chanCheckMore <- struct{}{}:
+		case self.chanToNew <- struct{}{}:
 		default:
 		}
 		if item != nil {
@@ -439,7 +417,6 @@ func (self *Pool) Close() {
 	default:
 	}
 
-	close(self.chanCheckMore)
 	close(self.chanToNew)
 	close(self.chanTotal)
 	close(self.chanClose)
