@@ -37,10 +37,12 @@ type Creator interface {
 	// This method will be called every time before Pool.Get() returning a PoolItem to user.
 	// Every item returned from Get() will be initialized with this method.
 	//
-	// item is the one will be returned by Get().
-	//
+	// item is the one will be returned by Pool.Get().
 	// n is the use count of this item.
 	// n = 1 means the first use of this item.
+	//
+	// If the returned error is not nil, item.SetErr() and item.Close() will be
+	// called sequentially by connpool, and item will not be returned by Pool.Get()
 	InitItem(item PoolItem, n uint64) error
 	Close() error
 }
@@ -68,10 +70,12 @@ type Pool struct {
 	chanClose   chan struct{}
 }
 
-var errPoolClosed = errors.New("the pool is closed")
-var errIdleTimeout = errors.New("the item is idle timeout")
-var errIdleFull = errors.New("idle items are full")
-var errGetTimeout = errors.New("no item to get")
+var (
+	ErrPoolClosed  = errors.New("the pool is closed")
+	ErrIdleTimeout = errors.New("the item is idle timeout")
+	ErrIdleFull    = errors.New("idle items are full")
+	ErrGetTimeout  = errors.New("no item to get")
+)
 
 func newInfoItem(poolItem PoolItem) *itemInfo {
 	infoItem := &itemInfo{
@@ -214,7 +218,7 @@ func (self *Pool) checkIdle() {
 			select {
 			case self.chanIdle <- itemTemp:
 			case <-time.After(time.Duration(self.idleTimeout) * time.Second):
-				self.closeItem(itemTemp, errIdleTimeout)
+				self.closeItem(itemTemp, ErrIdleTimeout)
 				continue
 			}
 			time.Sleep(time.Duration(checkInterval) * time.Second)
@@ -233,7 +237,7 @@ func (self *Pool) Get() (_item PoolItem, _err error) {
 		if e := recover(); e != nil {
 			fmt.Printf("pool closed, panic:%v\n", e)
 			_item = nil
-			_err = errPoolClosed
+			_err = ErrPoolClosed
 		}
 	}()
 	var item *itemInfo = nil
@@ -242,7 +246,7 @@ func (self *Pool) Get() (_item PoolItem, _err error) {
 		select {
 		case item, ok = <-self.chanIdle:
 			if !ok {
-				return nil, errPoolClosed
+				return nil, ErrPoolClosed
 			}
 		default:
 			select {
@@ -264,7 +268,8 @@ func (self *Pool) Get() (_item PoolItem, _err error) {
 			if err := self.creator.InitItem(item.item, item.useCount); err != nil {
 				fmt.Printf("InitItem error, item:%v, self:%v, err:%v\n", item, self.name, err)
 				self.closeItem(item, err)
-				return nil, err
+				item = nil
+				continue
 			}
 			return item.item, nil
 		}
@@ -272,15 +277,15 @@ func (self *Pool) Get() (_item PoolItem, _err error) {
 			select {
 			case item, ok = <-self.chanIdle:
 				if !ok {
-					return nil, errPoolClosed
+					return nil, ErrPoolClosed
 				}
 			case <-time.After(time.Duration(self.getTimeout) * time.Second):
-				return nil, errGetTimeout
+				return nil, ErrGetTimeout
 			}
 		} else {
 			item, ok = <-self.chanIdle
 			if !ok {
-				return nil, errPoolClosed
+				return nil, ErrPoolClosed
 			}
 		}
 		select {
@@ -301,7 +306,8 @@ func (self *Pool) Get() (_item PoolItem, _err error) {
 			if err := self.creator.InitItem(item.item, item.useCount); err != nil {
 				fmt.Printf("InitItem error, item:%v, self:%v, err:%v\n", item, self.name, err)
 				self.closeItem(item, err)
-				return nil, err
+				item = nil
+				continue
 			}
 			return item.item, nil
 		}
@@ -317,7 +323,7 @@ func (self *Pool) checkIdleTimeout(item *itemInfo) bool {
 	}
 	markTime := time.Now().Unix() - int64(self.idleTimeout)
 	if item.idleTime <= markTime {
-		self.closeItem(item, errIdleTimeout)
+		self.closeItem(item, ErrIdleTimeout)
 		return true
 	}
 	return false
@@ -350,7 +356,7 @@ func (self *Pool) doClearItem(_item PoolItem) {
 		<-self.chanTotal
 		err := item.item.GetErr()
 		item.item.SetContainer(nil)
-		if err != errPoolClosed && err != errIdleFull && err != errIdleTimeout {
+		if err != ErrPoolClosed && err != ErrIdleFull && err != ErrIdleTimeout {
 			fmt.Printf("clearItem error to new:%v\n", err)
 			select {
 			case self.chanToNew <- struct{}{}:
@@ -397,7 +403,7 @@ func (self *Pool) doGiveBack(_item PoolItem) {
 	select {
 	case self.chanIdle <- item: //may send on closed channel
 	case <-time.After(time.Duration(10) * time.Second):
-		self.closeItem(item, errIdleFull)
+		self.closeItem(item, ErrIdleFull)
 		return
 	}
 	unit++
@@ -422,7 +428,7 @@ func (self *Pool) Close() {
 	close(self.chanClose)
 	close(self.chanIdle)
 	for item := range self.chanIdle {
-		self.closeItem(item, errPoolClosed)
+		self.closeItem(item, ErrPoolClosed)
 	}
 	self.creator.Close()
 }

@@ -1,5 +1,5 @@
 /*
-Package connpool is a general purpose connection pool.
+Package connpool is a general purpose connection pool, or can just be used as a freelist.
 
 Below is a demo showing how to use it.
 
