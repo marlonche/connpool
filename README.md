@@ -1,4 +1,4 @@
 # connpool
-General purpose connection pool written in Go, or can just be used as a freelist.
+Package connpool is a general purpose object pool, can be used as a connection pool or a freelist.
 
     go get "github.com/marlonche/connpool"
