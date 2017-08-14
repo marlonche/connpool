@@ -119,9 +119,9 @@ func (self *itemInfo) SetContainer(container PoolItem) {
 // Here active refers to an item being hold by a user after Pool.Get(),
 // while idle refers to an item in the pool waiting for Pool.Get().
 //
-// maxIdleNum is the maximum number of idle connections hold by this pool,
+// maxIdleNum is the maximum number of idle connections hold by this pool;
 //
-// idleTimeout is the timeout in second of idle connections, 0 means no timeout.
+// idleTimeout is the timeout in second of idle connections, 0 means no timeout;
 // If an item is in idle state for at least idleTimeout seconds, the item will be removed from pool.
 func NewPool(name string, creator Creator, maxTotalNum int, maxIdleNum int, idleTimeout int) *Pool {
 	fmt.Printf("NewPool, name:%v, maxTotalNum:%v, maxIdleNum:%v, idleTimeout:%v\n", name, maxTotalNum, maxIdleNum, idleTimeout)
@@ -231,7 +231,9 @@ func (self *Pool) SetGetTimeout(timeout int) {
 	self.getTimeout = timeout
 }
 
-// Get pooled item created by Creator.NewItem()
+// Get pooled item created by Creator.NewItem().
+// If SetGetTimeout() is called with non-zero value, Get() will return with
+// error ErrGetTimeout after timeout.
 func (self *Pool) Get() (_item PoolItem, _err error) {
 	defer func() {
 		if e := recover(); e != nil {
@@ -433,6 +435,7 @@ func (self *Pool) Close() {
 	self.creator.Close()
 }
 
+// Pool closed or not.
 func (self *Pool) Closed() bool {
 	select {
 	case <-self.chanClose:
@@ -442,10 +445,12 @@ func (self *Pool) Closed() bool {
 	}
 }
 
-func (self *Pool) GetItemNum() int {
-	return len(self.chanIdle)
+// Get total items number, active and idle.
+func (self *Pool) GetTotalNum() int {
+	return len(self.chanTotal)
 }
 
+// Get idle items number.
 func (self *Pool) GetIdleNum() int {
 	return len(self.chanIdle)
 }
