@@ -122,7 +122,8 @@ func (self *itemInfo) SetContainer(container PoolItem) {
 // maxIdleNum is the maximum number of idle connections hold by this pool;
 //
 // idleTimeout is the timeout in second of idle connections, 0 means no timeout;
-// If an item is in idle state for at least idleTimeout seconds, the item will be removed from pool.
+// If an item is in idle state for at least idleTimeout seconds, the item will be
+// closed with error ErrIdleTimeout.
 func NewPool(name string, creator Creator, maxTotalNum int, maxIdleNum int, idleTimeout int) *Pool {
 	fmt.Printf("NewPool, name:%v, maxTotalNum:%v, maxIdleNum:%v, idleTimeout:%v\n", name, maxTotalNum, maxIdleNum, idleTimeout)
 	if maxIdleNum == maxTotalNum {
@@ -385,6 +386,8 @@ func (self *Pool) IsItemActive(_item PoolItem) bool {
 //
 // This method is called by user in the implementation of PoolItem.Close() when
 // no error with item is detected.
+//
+// If idle items are full, this item will be closed with error ErrIdleFull.
 func (self *Pool) GiveBack(item PoolItem) {
 	go self.doGiveBack(item)
 }
