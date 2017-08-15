@@ -3,6 +3,7 @@ package connpool
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -54,6 +55,7 @@ type itemInfo struct {
 	idleTime int64
 	closed   bool
 	err      error
+	timer    *time.Timer
 }
 
 // The main pool struct.
@@ -68,6 +70,7 @@ type Pool struct {
 	getTimeout  int
 	creator     Creator
 	chanClose   chan struct{}
+	timerPool   sync.Pool
 }
 
 var (
@@ -84,6 +87,10 @@ func newInfoItem(poolItem PoolItem) *itemInfo {
 		useCount: 0,
 		idleTime: time.Now().Unix(),
 		closed:   false,
+		timer:    time.NewTimer(time.Second),
+	}
+	if !infoItem.timer.Stop() {
+		<-infoItem.timer.C
 	}
 	return infoItem
 }
@@ -139,6 +146,13 @@ func NewPool(name string, creator Creator, maxTotalNum int, maxIdleNum int, idle
 		chanToNew:   make(chan struct{}, 1),
 		chanTotal:   make(chan struct{}, maxTotalNum),
 		chanClose:   make(chan struct{}, 1),
+	}
+	pool.timerPool.New = func() interface{} {
+		t := time.NewTimer(time.Second)
+		if !t.Stop() {
+			<-t.C
+		}
+		return t
 	}
 	go pool.newItem()
 	go pool.checkIdle()
@@ -216,9 +230,21 @@ func (self *Pool) checkIdle() {
 			if self.checkIdleTimeout(itemTemp) {
 				continue
 			}
+			_t := self.timerPool.Get()
+			t, _ := _t.(*time.Timer)
+			if nil == t {
+				t = time.NewTimer(time.Duration(self.idleTimeout) * time.Second)
+			} else {
+				t.Reset(time.Duration(self.idleTimeout) * time.Second)
+			}
 			select {
 			case self.chanIdle <- itemTemp:
-			case <-time.After(time.Duration(self.idleTimeout) * time.Second):
+				if !t.Stop() {
+					<-t.C
+				}
+				self.timerPool.Put(t)
+			case <-t.C:
+				self.timerPool.Put(t)
 				self.closeItem(itemTemp, ErrIdleTimeout)
 				continue
 			}
@@ -228,6 +254,9 @@ func (self *Pool) checkIdle() {
 }
 
 // Set Get()'s timeout in second, 0 means no timeout.
+// Get() will return with error ErrGetTimeout on timeout.
+//
+// This method can be called after NewPool().
 func (self *Pool) SetGetTimeout(timeout int) {
 	self.getTimeout = timeout
 }
@@ -278,12 +307,23 @@ func (self *Pool) Get() (_item PoolItem, _err error) {
 			return item.item, nil
 		}
 		if self.getTimeout > 0 {
+			_t := self.timerPool.Get()
+			t, _ := _t.(*time.Timer)
+			if nil == t {
+				t = time.NewTimer(time.Duration(self.getTimeout) * time.Second)
+			} else {
+				t.Reset(time.Duration(self.getTimeout) * time.Second)
+			}
 			select {
 			case item, ok = <-self.chanIdle:
+				if !t.Stop() {
+					<-t.C
+				}
 				if !ok {
 					return nil, ErrPoolClosed
 				}
-			case <-time.After(time.Duration(self.getTimeout) * time.Second):
+			case <-t.C:
+				self.timerPool.Put(t)
 				return nil, ErrGetTimeout
 			}
 		} else {
@@ -412,9 +452,13 @@ func (self *Pool) doGiveBack(_item PoolItem) {
 	}
 	item.active = false
 	item.idleTime = time.Now().Unix()
+	item.timer.Reset(time.Duration(10) * time.Second)
 	select {
 	case self.chanIdle <- item: //may send on closed channel
-	case <-time.After(time.Duration(10) * time.Second):
+		if !item.timer.Stop() {
+			<-item.timer.C
+		}
+	case <-item.timer.C:
 		self.closeItem(item, ErrIdleFull)
 		return
 	}
