@@ -161,7 +161,7 @@ func NewStreamPool(name string, addr string, maxTotal int, maxIdle int, idleTime
 	streamPool := &StreamPool{
 		pool: connpool.NewPool(name, creator, maxTotal, maxIdle, idleTimeout),
 	}
-	streamPool.pool.SetGetTimeout(10)
+	//streamPool.pool.SetGetTimeout(10)
 	creator.pool = streamPool
 	return streamPool
 }

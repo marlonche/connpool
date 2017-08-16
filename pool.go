@@ -190,8 +190,8 @@ func (self *Pool) newItem() {
 			item, err := self.creator.NewItem()
 			if err != nil {
 				<-self.chanTotal
-				if len(self.chanTotal) < 5 {
-					time.Sleep(time.Minute)
+				if len(self.chanTotal) < 1 {
+					time.Sleep(time.Second * time.Duration(2))
 					select {
 					case <-self.chanClose:
 					case self.chanToNew <- struct{}{}:
@@ -253,7 +253,7 @@ func (self *Pool) checkIdle() {
 	}
 }
 
-// Set Get()'s timeout in second, 0 means no timeout.
+// Set Get()'s timeout in second, 0 means no timeout, default 0.
 // Get() will return with error ErrGetTimeout on timeout.
 //
 // This method can be called after NewPool().
