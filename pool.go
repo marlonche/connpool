@@ -319,6 +319,7 @@ func (self *Pool) Get() (_item PoolItem, _err error) {
 				if !t.Stop() {
 					<-t.C
 				}
+				self.timerPool.Put(t)
 				if !ok {
 					return nil, ErrPoolClosed
 				}
