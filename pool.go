@@ -9,7 +9,7 @@ import (
 
 // Pooled items should implement this interface.
 type PoolItem interface {
-	// Called after the PoolItem has been used.
+	// Called after finishing using the PoolItem.
 	// If the item is in error state, clear it by calling pool.ClearItem(),
 	// otherwise give it back by calling pool.GiveBack().
 	Close() error
@@ -423,7 +423,7 @@ func (self *Pool) IsItemActive(_item PoolItem) bool {
 	return false
 }
 
-// Call this method to give normal(non-error) items back to the pool after use.
+// Call this method to give normal(non-error) items back to the pool after finishing using.
 //
 // This method is called by user in the implementation of PoolItem.Close() when
 // no error with item is detected.

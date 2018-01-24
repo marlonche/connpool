@@ -3,10 +3,11 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"github.com/marlonche/connpool"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/marlonche/connpool"
 )
 
 type PooledStreamErr string
@@ -45,9 +46,11 @@ func (self *PooledStream) GetContainer() connpool.PoolItem {
 	return self.container
 }
 
-// Set the error if the error is not recoverable.
 // This method is called by connpool as well as by users who encounter errors when
 // using PooledStream, e.g., PooledStream.Read().
+// You can keep the error if it's unrecoverable and you want to discard the PooledStream,
+// or you can ignore the error if it doesn't affect the reuse of the PooledStream.
+// In PooledStream.Close(), you can check the kept error to discard or reuse PooledStream.
 func (self *PooledStream) SetErr(err error) {
 	self.Lock()
 	defer self.Unlock()
@@ -71,7 +74,7 @@ func (self *PooledStream) GetErr() error {
 	return self.err
 }
 
-// Called after the PooledStream has been used.
+// Called after finishing using the PooledStream.
 // If the item is in error state, clear it by calling Pool.ClearItem(),
 // otherwise give it back by calling Pool.GiveBack().
 func (self *PooledStream) Close() error {
