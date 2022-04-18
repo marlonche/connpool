@@ -1,6 +1,3 @@
-/*
-    Package connpool is a general purpose object pool which can be used as a connection pool or a freelist.
-*/
 package connpool
 
 import (
